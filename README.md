@@ -8,7 +8,7 @@ This is a python project that allows you to create a database with all your face
 You will need a mongo database were the data will be stored.
 Either [download and install mongodb](https://www.mongodb.com/download-center#community) or use a mongo service such as [mlab](https://mlab.com)
 
-After you have installed mongo, create database named facebook with two collections: people and bfs, and make sure that the link in the __init__() function of the Scraper class points to your database.
+After you have installed mongo, create database named facebook with two collections: people and bfs, and make sure that the link in the __init__() method of the Scraper class points to your database.
 
 
 ### Installing
