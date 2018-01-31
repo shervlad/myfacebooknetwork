@@ -49,6 +49,7 @@ If this is the first time you are running the script, type:
 
 ```
 s.add_person({"name" : "<your_facebook_name> ex: Jon Doe", "username": "<your_fb_username> ex: jon.doe", "friends": []})
+s.db.bfs.insert_one({'queue':[],'visited':[]})
 s.db.bfs.update_many({},{'$addToSet':{'queue':'<your_fb_username>}})
 ```
 
