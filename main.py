@@ -1,121 +1,54 @@
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
-import bs4 as bs
 import time
-import pymongo
-from pymongo import MongoClient
-from pymongo.collection import ObjectId
-from collections import deque
-
+from collections import deque, defaultdict
+from config import FACEBOOK_CONFIG
+import time
 class Scraper:
     #setup database connection
-    def __init__(self,dbusername,dbpass):
-        self.client = MongoClient('mongodb://%s:%s@localhost:27017/facebook'%(dbusername,dbpass))
-        self.db = self.client.facebook
-        self.driver = webdriver.Firefox()
+    def __init__(self):
+        self.driver = webdriver.Chrome()
 
-    def login(self,fbemail,fbpassword):
+    def login(self):
         self.driver.get("https://www.facebook.com/")
         email_field = self.driver.find_element_by_id("email")
         pass_field = self.driver.find_element_by_id("pass")
         log_in = self.driver.find_elements_by_xpath("//input[@value='Log In']")
-        email_field.send_keys(fbemail)
-        pass_field.send_keys(fbpassword)
+        email_field.send_keys(FACEBOOK_CONFIG["username"])
+        pass_field.send_keys(FACEBOOK_CONFIG["password"])
         log_in[0].send_keys(Keys.ENTER)
         time.sleep(5)
-        try:
-            not_now = self.driver.find_element_by_class_name("layerCancel")
-            not_now.click()
-        except e:
-            print(e)
 
-    def get_friends_from_fb(self, source):
+    def get_friends(self, source):
         self.driver.get("https://www.facebook.com/%s/friends"%(source))
-        html = self.driver.execute_script("return document.documentElement.outerHTML")
-        soup = bs.BeautifulSoup(html, 'html.parser')
-        n_friends = 99999999
-        print("Looking at %s\'s friends"%(source))
-        try:
-            f = soup.find_all(attrs={"name":"All friends"})
-            n_friends = int(f[0].find_all("span")[1].text)
-        except:
-            f = soup.find_all(attrs={"name":"Mutual friends"})
-            n_friends = int(f[0].find_all("span")[1].text)
-        print("He/she has %s friends"%(n_friends))
-        friends_on_page = len(soup.find_all("div","uiProfileBlockContent"))
-        fop = list(range(50))
-        footer = self.driver.find_element_by_id("pageFooter")
-
-        while(fop[-1] != fop[-7]):
+        profile_blocks = self.driver.find_elements_by_xpath("//div[@class='uiProfileBlockContent']")
+        last_len = 0
+        steps_unchanged = 0
+        while(True):
             self.driver.execute_script("window.scrollBy(0,500)","")
             self.driver.execute_script("window.scrollBy(0,500)","")
             self.driver.execute_script("window.scrollBy(0,500)","")
-            html = self.driver.execute_script("return document.documentElement.outerHTML")
-            soup = bs.BeautifulSoup(html, 'html.parser')
-            friends_on_page = len(soup.find_all("div", "uiProfileBlockContent"))
-            print("%s friends on the page. Scrolling..."%(friends_on_page))
-            fop.append(friends_on_page)
+            time.sleep(1)
+            profile_blocks = self.driver.find_elements_by_xpath("//div[@class='uiProfileBlockContent']")
+            if(len(profile_blocks) == last_len):
+                steps_unchanged += 1
+            else:
+                steps_unchanged = 0
+                last_len = len(profile_blocks)
 
-        profile_blocks = soup.find_all("div","uiProfileBlockContent")
-
+            if(steps_unchanged > 5):
+                break
         people = []
-        friends = []
+        friends = defaultdict(lambda: set())
         for div in profile_blocks:
-            link = div.find_all("a")[0]
+            link = div.find_element_by_tag_name("a")
             name = link.text
-            href = link.get("href")
+            href = link.get_attribute("href")
             username = ""
             if "profile.php" in href:
                 username =  href.replace("https://www.facebook.com/profile.php?id=","").replace("&fref=pb&hc_location=friends_tab","")
             else:
-                username = link.get("href").replace("https://www.facebook.com/","").replace("?fref=pb&hc_location=friends_tab","")
-            # db.people.insert_one({'name':name,'username':username})
+                username = href.replace("https://www.facebook.com/","").replace("?fref=pb&hc_location=friends_tab","")
             if username!="#":
-                friends.append({'name':name,'username':username, 'friends':[source]})
+                friends[source].add(username)
         return friends
-        # db.people.update_one({'username':'vlad.seremet'}, {'$set':{'friends':friends}})
-
-    def get_friends_from_db(self, username):
-        return [friend.str for friend in self.db.people.find_one({'username': username})['friends']]
-
-    def add_person(self,person):
-        if self.db.people.find({'username': person['username']}).count() > 0:
-            return
-        self.db.people.insert_one({'username':person['username'],
-                                   'name':person['name'],
-                                   'friends' : [friend for friend in person['friends']]
-                                   })
-
-    def add_friends(self,username,friends):
-        old_friends = self.db.people.find_one({'username' : username})['friends']
-        new_friends = [friend['username'] for friend in friends]
-        all_friends = list(set(old_friends + new_friends))
-        self.db.people.update_one({'username': username},{'$set':{'friends':all_friends}})
-
-    def add_people(self,people):
-        for p in people:
-            self.add_person(p)
-
-    def bfs(self,n):
-        q = deque()
-        visited = self.db.bfs.find()[0]['visited']
-
-        count = 0
-        while(count <= n):
-            f = self.db.bfs.aggregate([{ '$project' : {'elem' : {'$arrayElemAt' : ['$queue',0]}}}])
-            current = f.next()['elem']
-            self.db.bfs.update_many({},{'$pop':{'queue':-1}})
-            friends = self.get_friends_from_fb(current)
-            self.add_friends(current, friends)
-            self.add_people(friends)
-            for friend in friends:
-                friend_username = friend['username']
-                if friend_username not in visited:
-                    q.append(friend_username)
-                    visited.append(friend_username)
-                    self.db.bfs.update_many({},{'$addToSet':{'queue':friend_username}})
-                    self.db.bfs.update_many({},{'$addToSet':{'visited':friend_username}})
-            count += 1
-    def get_db_client(self):
-        return self.client
-
