@@ -1,7 +1,7 @@
 from main import Scraper
-
+from pprint import pprint
 
 s = Scraper()
 s.login()
 
-s.get_friends("vlad.seremet")
+pprint(s.get_friends("vlad.seremet"))

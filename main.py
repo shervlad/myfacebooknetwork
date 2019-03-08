@@ -4,10 +4,13 @@ import time
 from collections import deque, defaultdict
 from config import FACEBOOK_CONFIG
 import time
+from selenium.webdriver.chrome.options import Options
 class Scraper:
     #setup database connection
     def __init__(self):
-        self.driver = webdriver.Chrome()
+        chrome_options = Options()
+        chrome_options.add_argument("--disable-notifications")
+        self.driver = webdriver.Chrome(chrome_options=chrome_options)
 
     def login(self):
         self.driver.get("https://www.facebook.com/")
@@ -21,23 +24,25 @@ class Scraper:
 
     def get_friends(self, source):
         self.driver.get("https://www.facebook.com/%s/friends"%(source))
-        profile_blocks = self.driver.find_elements_by_xpath("//div[@class='uiProfileBlockContent']")
+        profile_container = self.driver.find_element_by_id("pagelet_timeline_medley_friends")
         last_len = 0
         steps_unchanged = 0
         while(True):
             self.driver.execute_script("window.scrollBy(0,500)","")
             self.driver.execute_script("window.scrollBy(0,500)","")
             self.driver.execute_script("window.scrollBy(0,500)","")
-            time.sleep(1)
-            profile_blocks = self.driver.find_elements_by_xpath("//div[@class='uiProfileBlockContent']")
-            if(len(profile_blocks) == last_len):
+            print("size : ",profile_container.size)
+            time.sleep(0.2)
+            if(profile_container.size["height"] == last_len):
                 steps_unchanged += 1
             else:
                 steps_unchanged = 0
-                last_len = len(profile_blocks)
+                last_len = profile_container.size["height"]
 
             if(steps_unchanged > 5):
                 break
+
+        profile_blocks = self.driver.find_elements_by_xpath("//div[@class='uiProfileBlockContent']")
         people = []
         friends = defaultdict(lambda: set())
         for div in profile_blocks:
