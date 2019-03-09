@@ -4,15 +4,17 @@ import time
 from collections import deque, defaultdict
 from config import FACEBOOK_CONFIG
 import time
-from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
+
 class Scraper:
     #setup database connection
     def __init__(self):
-        chrome_options = Options()
-        chrome_options.add_argument("--disable-notifications")
-        chrome_options.add_argument("headless")
-        self.driver = webdriver.Chrome(chrome_options=chrome_options)
-
+        browser_options = Options()
+        browser_options.add_argument("--disable-notifications")
+        browser_options.add_argument("headless")
+        self.driver = webdriver.Firefox(firefox_options = browser_options,
+                                        firefox_binary=FirefoxBinary( firefox_path='/usr/bin/firefox'))
     def login(self):
         self.driver.get("https://www.facebook.com/")
         email_field = self.driver.find_element_by_id("email")
