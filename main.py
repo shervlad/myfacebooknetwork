@@ -10,6 +10,7 @@ class Scraper:
     def __init__(self):
         chrome_options = Options()
         chrome_options.add_argument("--disable-notifications")
+        chrome_options.add_argument("headless")
         self.driver = webdriver.Chrome(chrome_options=chrome_options)
 
     def login(self):
@@ -20,7 +21,6 @@ class Scraper:
         email_field.send_keys(FACEBOOK_CONFIG["username"])
         pass_field.send_keys(FACEBOOK_CONFIG["password"])
         log_in[0].send_keys(Keys.ENTER)
-        time.sleep(5)
 
     def get_friends(self, source):
         self.driver.get("https://www.facebook.com/%s/friends"%(source))
@@ -38,13 +38,14 @@ class Scraper:
             else:
                 steps_unchanged = 0
                 last_len = profile_container.size["height"]
-
-            if(steps_unchanged > 5):
+            if(steps_unchanged > 12):
                 break
+            if(steps_unchanged > 10):
+                time.sleep(2)
 
         profile_blocks = self.driver.find_elements_by_xpath("//div[@class='uiProfileBlockContent']")
         people = []
-        friends = defaultdict(lambda: set())
+        friends = dict()
         for div in profile_blocks:
             link = div.find_element_by_tag_name("a")
             name = link.text
@@ -55,5 +56,11 @@ class Scraper:
             else:
                 username = href.replace("https://www.facebook.com/","").replace("?fref=pb&hc_location=friends_tab","")
             if username!="#":
-                friends[source].add(username)
+                friends[username] = name
         return friends
+
+    def get_locations(self,fbid):
+        self.driver.get("https://www.facebook.com/%s/about?&section=living"%fbid)
+        spans = self.driver.find_elements_by_xpath("//span[@class='_2iel _50f7']")
+        locations =  [span.text for span in spans]
+        return locations
